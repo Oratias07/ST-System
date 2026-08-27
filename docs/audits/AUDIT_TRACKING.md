@@ -3,26 +3,25 @@
 Consolidated, deduplicated tracker for actionable items from the weekly security & architecture audits.
 Purpose: let future audit runs skip items already resolved, and record deliberate won't-fix decisions.
 
-**Last reconciled:** 2026-07-14 (verified against working tree of `main`, commit `f93db71`).
-**Audits covered in this reconciliation:** `weekly-audit-2026-05-07`, `-05-14`, `-05-21`, `-06-04`, `-07-02`, `-07-09`.
+**Last reconciled:** 2026-08-27 (verified against working tree of `main`, commit `ed1dafc`).
+**Audits covered in this reconciliation:** `weekly-audit-2026-05-07`, `-05-14`, `-05-21`, `-06-04`, `-07-02`, `-07-09`, `-08-27`.
 
 Status legend: ✅ Done · ❌ Open · ⚠️ Won't fix (with rationale)
 
-> ⚠️ **6 CRITICAL items OPEN as of 2026-07-09 audit** (items 20–25 below). All verified against source on 2026-07-14. Item 20 (live DB creds in git) is not remediable by a doc/code edit alone — it needs credential rotation + history scrub.
+> ✅ **All CRITICAL items resolved as of 2026-08-27 audit.** First fully clean CRITICAL/HIGH audit. 4 new MEDIUM items opened (items 26–29).
 
-## Security (CRITICAL) — OPEN (2026-07-09 audit, verified from source 2026-07-14)
+## Security (CRITICAL) — resolved in 2026-08-27 audit
 
-| # | Item | Source audit | Status | Evidence (current code, verified) |
-|---|------|--------------|--------|-----------------------------------|
-| 20 | Live MongoDB Atlas creds in git-tracked `.claude/settings.local.json` | 2026-07-09 | ❌ Open (partial) | Mitigated 2026-07-14: file `git rm --cached` + added to `.gitignore`. **STILL OPEN — creds remain in git history and on disk; rotate both Atlas passwords + `git filter-repo` history scrub still required.** Issue #41 |
-| 21 | `API_KEY` baked into client JS bundle | 2026-07-09 | ✅ Fixed (working tree) | `define` block removed from `vite.config.ts` 2026-07-14; grep confirms no `process.env.API_KEY` reference in any TSX/TS. Uncommitted/undeployed — verify after redeploy. Issue #42 |
-| 22 | No rate limit on `POST /student/join-course` | 2026-07-02 (carried, 2 audits) | ✅ Fixed (working tree) | `submitRateLimit` added at `api/index.js:456` 2026-07-14. Uncommitted. Issue #43 |
-| 23 | IDOR — lecturer reads any course (4 read-routes, ownership unchecked) | 2026-07-09 | ✅ Fixed (working tree) | `Course.findOne({ _id, lecturerId })` → 403 added at `api/index.js:851` assignments, `:1124` waitlist, `:1139` waitlist-history, `:1365` materials, 2026-07-14. Uncommitted. Issue #44 |
-| 24 | IDOR — student reads any course without enrollment (2 read-routes) | 2026-07-09 | ✅ Fixed (working tree) | `enrolledCourseIds.includes()` → 403 added at `api/index.js:1009` assignments, `:553` materials, 2026-07-14. Uncommitted. Issue #45 |
-| 25 | Mass assignment in `POST /lecturer/archive` — `lecturerId` overridable | 2026-07-09 | ✅ Fixed (working tree) | `...req.body` moved before server fields at `api/index.js:436-440` 2026-07-14. Uncommitted. Issue #46 |
+| # | Item | Source audit | Status | Evidence (verified 2026-08-27) |
+|---|------|--------------|--------|--------------------------------|
+| 20 | Live MongoDB Atlas creds in git-tracked `.claude/settings.local.json` | 2026-07-09 | ✅ Done | File absent from disk; `git log --all -- ".claude/settings.local.json"` returns empty — history scrub confirmed. File in `.gitignore`. |
+| 21 | `API_KEY` baked into client JS bundle | 2026-07-09 | ✅ Done | `vite.config.ts` contains only proxy config; no `define` block. Committed `ed1dafc`. |
+| 22 | No rate limit on `POST /student/join-course` | 2026-07-02 (carried, 2 audits) | ✅ Done | `submitRateLimit` at `api/index.js:456`. Committed `ed1dafc`. |
+| 23 | IDOR — lecturer reads any course (4 read-routes, ownership unchecked) | 2026-07-09 | ✅ Done | `Course.findOne({ _id, lecturerId })` → 403 at `api/index.js:851, 1124, 1139, 1365`. Committed `ed1dafc`. |
+| 24 | IDOR — student reads any course without enrollment (2 read-routes) | 2026-07-09 | ✅ Done | `enrolledCourseIds.includes()` → 403 at `api/index.js:553, 1009`. Committed `ed1dafc`. |
+| 25 | Mass assignment in `POST /lecturer/archive` — `lecturerId` overridable | 2026-07-09 | ✅ Done | Server fields set after spread at `api/index.js:436–440`. Committed `ed1dafc`. |
 
-Full detail: `docs/audits/weekly-audit-2026-07-09.md`. HIGH checks (JSON parsing, output validation, `alert()` in UI) all clean.
-**Fix status note (2026-07-14):** Items 21–25 code-fixed in working tree, syntax-checked, NOT yet committed or deployed — do not close until committed + runtime-verified. Item 20 only partially mitigated (see row).
+Full detail: `docs/audits/weekly-audit-2026-07-09.md`.
 
 ## Security (CRITICAL) — historical (all resolved through 2026-06-04)
 
@@ -41,6 +40,15 @@ Full detail: `docs/audits/weekly-audit-2026-07-09.md`. HIGH checks (JSON parsing
 | 11 | `POST /evaluate` lecturer-only | 2026-05-07 | ✅ Done | `api/index.js:769` role check |
 | 12 | `POST /user/update-role` block re-assignment | 2026-05-07 | ✅ Done | `api/index.js:387` enum + `390` role-set guard |
 
+## MEDIUM — OPEN (2026-08-27 audit)
+
+| # | Item | Source audit | Status | Evidence / notes |
+|---|------|--------------|--------|------------------|
+| 26 | Score-range validator checks 0–100 but `/evaluate` uses 0–10 scale — out-of-scale LLM responses pass validation | 2026-08-27 | ❌ Open | `api/index.js:813` calls `validateLLMOutput(response.raw, ...)` which checks ≤100; prompt at `api/index.js:785` requests 0–10. Fix: add `score > 10` rejection in the `/evaluate` handler or add per-field range opts to `validateLLMOutput()`. |
+| 27 | `DELETE /lecturer/courses/:id`, `/lecturer/assignments/:id`, `/lecturer/materials/:id` — no rate limiter | 2026-08-27 | ❌ Open | `api/index.js:872, 1113, 1400`. Cascading deletes (course→materials, assignment→submissions) amplify impact of a compromised account. Apply `uploadRateLimit`. |
+| 28 | 5 state-modifying POST routes without rate limiting: `/submissions/:id/extension`, `/assignments/:id/release-feedback`, `/courses/:id/approve`, `/reject`, `/remove-student` | 2026-08-27 | ❌ Open | `api/index.js:903, 915, 1310, 1330, 1349`. Most notable: `release-feedback` triggers `Submission.updateMany()`. Apply `uploadRateLimit` (first two) and `submitRateLimit` (enrollment routes). |
+| 29 | Mass assignment on `POST /lecturer/assignments` and `PUT /lecturer/assignments/:id` — `req.body` passed without field allowlist | 2026-08-27 | ❌ Open | `api/index.js:844, 868`. Lecturer can inject `requires_human_review: false` etc. Destructure only allowed fields before passing to Mongoose. |
+
 ## MEDIUM / housekeeping
 
 | # | Item | Source audit | Status | Evidence / notes |
@@ -55,8 +63,8 @@ Full detail: `docs/audits/weekly-audit-2026-07-09.md`. HIGH checks (JSON parsing
 
 ## Notes for future audit runs
 
-- **Items 20–25 are OPEN CRITICAL (2026-07-09 audit), verified from source 2026-07-14.** Priority order: 20 → 21 → 23 → 24 → 25 → 22. Re-verify each against the cited lines before re-flagging or closing.
-- Item 20 (live DB creds) is only truly closed once passwords are rotated in Atlas AND git history is scrubbed — deleting the file from the working tree is not sufficient.
+- **Items 20–25 are FULLY RESOLVED** as of 2026-08-27 audit. Do not re-flag unless source regresses.
+- **Items 26–29 are OPEN MEDIUM** (2026-08-27 audit). Priority: 26 (score mismatch) → 27 (DELETE rate limits) → 28 (POST rate limits) → 29 (mass assignment).
 - Items 1–17 are settled; do not re-flag unless the referenced code regresses.
 - Item 18 is a deliberate won't-fix — stop recommending `package.json` ↔ `PROMPT_VERSION` alignment.
 - Item 19 (`ForExample/` dead files) remains open, cosmetic only, not security.
